@@ -1,0 +1,379 @@
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>凸/凹透镜成像模拟器（初中物理）</title>
+<style>
+  body{font-family: system-ui, -apple-system, "Helvetica Neue", Arial; margin:20px; color:#111}
+  h1{font-size:20px;margin:0 0 8px}
+  .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:12px 0}
+  label{font-size:13px}
+  input[type=range]{width:260px}
+  .panel{display:flex;gap:18px;align-items:flex-start}
+  #canvasWrap{background:#f7f9fc;border:1px solid #ddd;padding:12px;border-radius:8px}
+  canvas{background:linear-gradient(180deg, #ffffff 0%, #fbfeff 100%);border-radius:6px}
+  .info{font-size:13px;line-height:1.5;min-width:260px}
+  .small{font-size:12px;color:#555}
+  button{padding:6px 10px;border-radius:6px;border:1px solid #bbb;background:#fff;cursor:pointer}
+  .inline{display:inline-flex;gap:8px;align-items:center}
+  .note{font-size:12px;color:#666;margin-top:8px}
+  .value{font-weight:600;margin-left:6px}
+</style>
+</head>
+<body>
+<h1>凸/凹透镜成像模拟器（可拖动蜡烛查看一倍/二倍焦距位置）</h1>
+
+<div class="controls">
+  <div class="inline">
+    <label>透镜类型：</label>
+    <button id="lensConvex" title="凸透镜 (会聚)">凸透镜</button>
+    <button id="lensConcave" title="凹透镜 (发散)">凹透镜</button>
+  </div>
+
+  <div class="inline">
+    <label>焦距 f (cm):</label>
+    <input id="fInput" type="number" value="10" min="1" step="1" style="width:70px"/>
+  </div>
+
+  <div style="min-width:330px">
+    <label>蜡烛（物体）距离 d<sub>o</sub> (cm): <span id="doVal" class="value"></span></label><br/>
+    <input id="doRange" type="range" min="1" max="80" value="30" step="0.5"/>
+    <div class="small">可拖动；试试 f, 1f, 2f 的位置（例如 f=10 → 10cm、20cm）</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div id="canvasWrap">
+    <canvas id="sim" width="920" height="420"></canvas>
+    <div class="note">说明：蓝线为入射/折射光线，虚像用虚线表示。点击“重置”恢复默认位置。</div>
+    <div style="margin-top:8px">
+      <button id="resetBtn">重置</button>
+      <button id="downloadBtn">下载 HTML 文件</button>
+    </div>
+  </div>
+
+  <div class="info" id="infoBox">
+    <div><strong>像的性质：</strong></div>
+    <div id="nature">--</div>
+    <div style="margin-top:10px"><strong>计算结果（Lens formula）</strong></div>
+    <div class="small">公式：1/f = 1/d<sub>o</sub> + 1/d<sub>i</sub></div>
+    <div id="calc" class="small" style="margin-top:6px">--</div>
+    <div style="margin-top:12px"><strong>提示：</strong></div>
+    <ul class="small">
+      <li>凸透镜 f > 0，凹透镜 f &lt; 0（请在数值框填正数，透镜类型决定正负号）。</li>
+      <li>实像位于透镜另一侧（di > 0），可用屏幕接收；虚像位于物体同侧（di < 0）。</li>
+      <li>在物距 = f 时，像在无限远（不可计算），用射线示意。</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const lensX = Math.round(w*0.45); // lens vertical line x
+  const axisY = Math.round(h*0.6);
+  const scalePxPerCm = 8; // scaling from cm to pixels (adjustable)
+  let lensType = 'convex'; // 'convex' or 'concave'
+  const fInput = document.getElementById('fInput');
+  const doRange = document.getElementById('doRange');
+  const doVal = document.getElementById('doVal');
+  const natureDiv = document.getElementById('nature');
+  const calcDiv = document.getElementById('calc');
+
+  function draw() {
+    ctx.clearRect(0,0,w,h);
+    // axis
+    ctx.strokeStyle = '#bbb';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0,axisY);
+    ctx.lineTo(w,axisY);
+    ctx.stroke();
+
+    // lens
+    drawLens();
+
+    // get parameters
+    const f_cm = parseFloat(fInput.value) || 10;
+    const f = (lensType==='convex') ? f_cm : -f_cm;
+    const do_cm = parseFloat(doRange.value);
+    doVal.textContent = do_cm.toFixed(2) + ' cm';
+
+    // compute image distance using lens formula
+    // handle special case do == f => image at infinity
+    let di_cm = null;
+    let infinite = false;
+    if (Math.abs(1/f - 1/do_cm) < 1e-9) {
+      infinite = true;
+    } else {
+      di_cm = 1 / (1/f - 1/do_cm);
+    }
+
+    // magnification m = -di/do
+    const m = (di_cm===null) ? null : -di_cm / do_cm;
+
+    // object and image positions in pixels
+    const objX = lensX - do_cm * scalePxPerCm;
+    const objH = 55; // fixed object height in px
+    const imgX = (di_cm===null) ? null : lensX + di_cm * scalePxPerCm;
+    const imgH = (m===null) ? null : Math.abs(m) * objH;
+
+    // draw object (candle) as arrow
+    drawArrow(objX, axisY, objH, true, '物体');
+
+    // draw focal points
+    drawFoci(f_cm);
+
+    // draw image
+    if (infinite) {
+      natureDiv.textContent = '物体位于焦点（物距 = f），像在无限远（平行光）→ 无法成像在屏幕上。';
+      calcDiv.textContent = `f=${f_cm} cm；do=${do_cm} cm → image at infinity。`;
+      // draw parallel rays after lens
+      drawRaysForInfinity(objX, objH, f_cm, do_cm);
+    } else {
+      // draw image (real: upright? check sign)
+      const isReal = di_cm > 0;
+      drawArrow(imgX, axisY, imgH, !isReal, isReal ? '像（实像）' : '像（虚像）', isReal);
+      // draw rays
+      drawRays(objX, objH, imgX, imgH, f_cm, di_cm, do_cm);
+      // set nature text
+      let natureTxt = '';
+      natureTxt += isReal ? '实像；' : '虚像；';
+      natureTxt += (m!==null) ? (Math.abs(m)>=1 ? '放大；' : '缩小；') : '';
+      natureTxt += (m<0) ? '倒立；' : '正立；';
+      calcDiv.textContent = `f=${f_cm} cm；d_o=${do_cm} cm；d_i=${di_cm.toFixed(3)} cm；放大率 m=${m.toFixed(3)}。`;
+      natureDiv.textContent = natureTxt;
+    }
+
+    // draw scale markers on axis (cm markers)
+    drawScale();
+  }
+
+  function drawLens(){
+    // simple lens representation: vertical line + curved sides
+    ctx.save();
+    ctx.translate(lensX,0);
+    ctx.strokeStyle = '#2a5d9f';
+    ctx.fillStyle = 'rgba(42,93,159,0.06)';
+    ctx.lineWidth = 2;
+    // body
+    ctx.beginPath();
+    const H = 220;
+    if (lensType==='convex') {
+      // double-convex shape
+      ctx.moveTo(0, axisY - H/2);
+      ctx.bezierCurveTo(30, axisY - H/2, 30, axisY + H/2, 0, axisY + H/2);
+      ctx.lineTo(0, axisY - H/2);
+    } else {
+      // double-concave
+      ctx.moveTo(0, axisY - H/2);
+      ctx.bezierCurveTo(-30, axisY - H/2, -30, axisY + H/2, 0, axisY + H/2);
+      ctx.lineTo(0, axisY - H/2);
+    }
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawFoci(f_cm) {
+    const fx = lensX + f_cm * ((lensType==='convex')?1:-1) * scalePxPerCm;
+    const fx2 = lensX - f_cm * ((lensType==='convex')?1:-1) * scalePxPerCm;
+    // positive and negative focal points drawn both sides for clarity
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath();
+    ctx.arc(lensX + f_cm*scalePxPerCm, axisY, 4,0,Math.PI*2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lensX - f_cm*scalePxPerCm, axisY, 4,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle='#333';
+    ctx.font='12px sans-serif';
+    ctx.fillText('F', lensX + f_cm*scalePxPerCm +6, axisY -8);
+    ctx.fillText('F\'', lensX - f_cm*scalePxPerCm +6, axisY -8);
+  }
+
+  function drawArrow(x, baseY, heightPx, flipped=false, label='', solid=true){
+    // arrow pointing up by default (object usually up). flipped: draw dashed for virtual image (same side) when needed
+    ctx.save();
+    ctx.translate(0,0);
+    if (!solid) {
+      ctx.setLineDash([6,6]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.strokeStyle = '#222';
+    ctx.fillStyle = '#222';
+    ctx.lineWidth = 2;
+    // shaft
+    const topY = baseY - heightPx;
+    ctx.beginPath();
+    ctx.moveTo(x, baseY);
+    ctx.lineTo(x, topY+12);
+    ctx.stroke();
+    // arrow head as triangle
+    ctx.beginPath();
+    ctx.moveTo(x, topY+12);
+    ctx.lineTo(x-8, topY+26);
+    ctx.lineTo(x+8, topY+26);
+    ctx.closePath();
+    ctx.fill();
+    // base
+    ctx.beginPath();
+    ctx.moveTo(x-14, baseY);
+    ctx.lineTo(x+14, baseY);
+    ctx.stroke();
+    // label
+    ctx.font='12px sans-serif';
+    ctx.fillText(label, x-10, topY-6);
+    ctx.restore();
+  }
+
+  function drawScale(){
+    ctx.save();
+    ctx.fillStyle='#666';
+    ctx.font='11px sans-serif';
+    // draw ticks every 10 cm
+    const leftCm = Math.floor((0 - lensX) / scalePxPerCm);
+    const rightCm = Math.ceil((w - lensX) / scalePxPerCm);
+    for (let cm = -leftCm; cm < rightCm; cm+=2){
+      const x = lensX + cm * scalePxPerCm;
+      if (x < 0 || x > w) continue;
+      ctx.beginPath();
+      ctx.moveTo(x, axisY-6);
+      ctx.lineTo(x, axisY+6);
+      ctx.strokeStyle = '#ddd';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.fillStyle = '#333';
+      ctx.fillText((cm).toString(), x-6, axisY+20);
+    }
+    ctx.restore();
+  }
+
+  function drawRays(objX, objH, imgX, imgH, f_cm, di_cm, do_cm){
+    ctx.save();
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = '#2b86c6';
+    ctx.fillStyle = '#2b86c6';
+    ctx.setLineDash([]);
+    // three principal rays from top of object
+    const objTop = {x: objX, y: axisY - objH};
+    // 1) ray parallel to axis -> through focal point on other side
+    ctx.beginPath();
+    ctx.moveTo(objTop.x, objTop.y);
+    const hitLensY = objTop.y + (lensX - objTop.x) * (0); // same y at lens
+    ctx.lineTo(lensX, objTop.y);
+    // after lens, goes to image top (if real) or appears to come from virtual focus
+    if (di_cm > 0){
+      ctx.lineTo(imgX, axisY - imgH);
+    } else {
+      // virtual: draw dashed extension backward from lens
+      ctx.lineTo(lensX + 120, objTop.y - 60);
+    }
+    ctx.stroke();
+
+    // 2) ray through center of lens (undeviated approx)
+    ctx.beginPath();
+    ctx.moveTo(objTop.x, objTop.y);
+    const centerX = lensX;
+    const centerY = axisY;
+    ctx.lineTo(centerX+ (imgX? (imgX-centerX):120), axisY - (imgH || 20));
+    ctx.stroke();
+
+    // 3) ray aimed towards focal point on object side -> becomes parallel after lens
+    ctx.beginPath();
+    ctx.moveTo(objTop.x, objTop.y);
+    // intersection toward focal point on left side
+    const focalLeftX = lensX - f_cm * scalePxPerCm;
+    ctx.lineTo(focalLeftX, axisY);
+    // after lens becomes parallel to axis
+    ctx.lineTo(lensX + 200, axisY);
+    ctx.stroke();
+
+    // For virtual images, draw dashed backward extensions to indicate virtual intersection
+    if (di_cm < 0){
+      // draw dashed lines backward from lens to show intersection
+      ctx.setLineDash([6,6]);
+      ctx.beginPath();
+      // extension of ray 1 backward
+      ctx.moveTo(lensX, objTop.y);
+      ctx.lineTo(imgX || lensX - Math.abs(di_cm)*scalePxPerCm, axisY - imgH);
+      ctx.stroke();
+      // extension of ray through center back
+      ctx.beginPath();
+      ctx.moveTo(lensX, axisY - (imgH || 20));
+      ctx.lineTo(imgX || lensX - Math.abs(di_cm)*scalePxPerCm, axisY - imgH);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.restore();
+  }
+
+  function drawRaysForInfinity(objX, objH, f_cm, do_cm){
+    ctx.save();
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#2b86c6';
+    ctx.setLineDash([4,4]);
+    // draw a couple of rays emerging nearly parallel
+    ctx.beginPath();
+    ctx.moveTo(objX, axisY - objH);
+    ctx.lineTo(lensX, axisY - objH);
+    ctx.lineTo(w, axisY - objH);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(objX, axisY - 0.6*objH);
+    ctx.lineTo(lensX, axisY - 0.6*objH);
+    ctx.lineTo(w, axisY - 0.6*objH);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // event handlers
+  document.getElementById('lensConvex').addEventListener('click', ()=>{
+    lensType='convex';
+    fInput.value = Math.abs(fInput.value) || 10;
+    draw();
+  });
+  document.getElementById('lensConcave').addEventListener('click', ()=>{
+    lensType='concave';
+    fInput.value = Math.abs(fInput.value) || 10;
+    draw();
+  });
+
+  doRange.addEventListener('input', draw);
+  fInput.addEventListener('change', ()=>{
+    // clamp
+    if (parseFloat(fInput.value) <= 0) fInput.value = 1;
+    draw();
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', ()=>{
+    lensType='convex';
+    fInput.value = 10;
+    doRange.value = 30;
+    draw();
+  });
+
+  // download button: open the same file (will trigger browser save/open)
+  document.getElementById('downloadBtn').addEventListener('click', ()=>{
+    const url = window.location.href;
+    // attempt to download the current page as file
+    const blob = new Blob([document.documentElement.outerHTML], {type: 'text/html'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'lens_simulator.html';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // initial draw
+  draw();
+})();
+</script>
+</body>
+</html>
