@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>单位换算题目生成器</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: linear-gradient(135deg, #6e8efb, #a777e3);
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+      color: white;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+    
+    .header p {
+      font-size: 1.1rem;
+      max-width: 600px;
+      line-height: 1.6;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background-color: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      overflow: hidden;
+    }
+    
+    .instruction {
+      padding: 20px;
+      background-color: #f8f9fa;
+      border-bottom: 1px solid #e9ecef;
+    }
+    
+    .instruction h3 {
+      color: #495057;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .instruction h3 i {
+      color: #6c757d;
+    }
+    
+    .instruction p {
+      color: #6c757d;
+      line-height: 1.5;
+    }
+    
+    .question-container {
+      padding: 25px;
+    }
+    
+    .question {
+      margin-bottom: 25px;
+      padding-bottom: 25px;
+      border-bottom: 1px solid #e9ecef;
+    }
+    
+    .question:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+    
+    .question-text {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #212529;
+      display: flex;
+      align-items: center;
+    }
+    
+    .question-number {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      background-color: #6e8efb;
+      color: white;
+      border-radius: 50%;
+      margin-right: 12px;
+      font-size: 14px;
+    }
+    
+    .answer-input {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    input[type="number"] {
+      width: 120px;
+      padding: 12px 15px;
+      border: 2px solid #dee2e6;
+      border-radius: 8px;
+      font-size: 16px;
+      transition: all 0.3s;
+    }
+    
+    input[type="number"]:focus {
+      border-color: #6e8efb;
+      box-shadow: 0 0 0 3px rgba(110, 142, 251, 0.2);
+      outline: none;
+    }
+    
+    .unit {
+      font-size: 16px;
+      color: #495057;
+      font-weight: 500;
+    }
+    
+    .buttons {
+      display: flex;
+      gap: 15px;
+      padding: 20px;
+      background-color: #f8f9fa;
+      border-top: 1px solid #e9ecef;
+    }
+    
+    button {
+      flex: 1;
+      padding: 14px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    
+    #submitBtn {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    #submitBtn:hover {
+      background-color: #45a049;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    #resetBtn {
+      background-color: #ff9800;
+      color: white;
+    }
+    
+    #resetBtn:hover {
+      background-color: #f57c00;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .result {
+      padding: 25px;
+      background-color: #e7f9e7;
+      border-top: 1px solid #b5e5b5;
+      display: none;
+    }
+    
+    .result h3 {
+      color: #2e7d32;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .answer-item {
+      margin-bottom: 12px;
+      padding: 12px 15px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+    
+    .answer-item:last-child {
+      margin-bottom: 0;
+    }
+    
+    .correct {
+      color: #2e7d32;
+      font-weight: 500;
+    }
+    
+    .score {
+      text-align: center;
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #6e8efb;
+      color: white;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 18px;
+    }
+    
+    @media (max-width: 600px) {
+      body {
+        padding: 15px;
+      }
+      
+      .header h1 {
+        font-size: 2rem;
+      }
+      
+      .question-text {
+        font-size: 16px;
+      }
+      
+      input[type="number"] {
+        width: 100px;
+        padding: 10px 12px;
+      }
+      
+      .buttons {
+        flex-direction: column;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>单位换算题目生成器</h1>
+    <p>每次重置都会生成全新的单位换算题目，练习长度、时间、重量和体积单位的换算</p>
+  </div>
+  
+  <div class="container">
+    <div class="instruction">
+      <h3><i>📝</i> 说明</h3>
+      <p>请完成以下单位换算题目，在输入框中填写正确的数值。点击"提交答案"检查结果，点击"生成新题目"获取全新题目。</p>
+    </div>
+    
+    <div class="question-container" id="questions">
+      <!-- 题目将由JavaScript动态生成 -->
+    </div>
+    
+    <div class="buttons">
+      <button id="submitBtn">提交答案</button>
+      <button id="resetBtn">生成新题目</button>
+    </div>
+    
+    <div id="result" class="result">
+      <h3><i>✅</i> 答案与结果</h3>
+      <div id="answers">
+        <!-- 答案将由JavaScript动态生成 -->
+      </div>
+      <div id="scoreDisplay" class="score"></div>
+    </div>
+  </div>
+
+  <script>
+    // 题目数据
+    const questionTemplates = [
+      // 长度单位换算
+      { fromUnit: "km", toUnit: "m", factor: 1000, fromValues: [2, 3, 4, 5, 6, 7, 8] },
+      { fromUnit: "m", toUnit: "cm", factor: 100, fromValues: [1, 2, 3, 4, 5, 6] },
+      { fromUnit: "cm", toUnit: "mm", factor: 10, fromValues: [5, 10, 15, 20, 25, 30] },
+      { fromUnit: "m", toUnit: "km", factor: 0.001, fromValues: [500, 750, 1000, 1250, 1500] },
+      { fromUnit: "mm", toUnit: "m", factor: 0.001, fromValues: [250, 500, 750, 1000, 1250] },
+      
+      // 时间单位换算
+      { fromUnit: "h", toUnit: "min", factor: 60, fromValues: [1, 2, 3, 4, 5, 6] },
+      { fromUnit: "h", toUnit: "s", factor: 3600, fromValues: [1, 2, 3, 4, 5] },
+      { fromUnit: "min", toUnit: "s", factor: 60, fromValues: [5, 10, 15, 20, 30] },
+      { fromUnit: "min", toUnit: "h", factor: 1/60, fromValues: [30, 60, 90, 120, 150] },
+      { fromUnit: "s", toUnit: "min", factor: 1/60, fromValues: [60, 120, 180, 240, 300] },
+      
+      // 重量单位换算
+      { fromUnit: "kg", toUnit: "g", factor: 1000, fromValues: [0.5, 1, 1.5, 2, 2.5] },
+      { fromUnit: "g", toUnit: "kg", factor: 0.001, fromValues: [500, 750, 1000, 1250, 1500] },
+      { fromUnit: "kg", toUnit: "t", factor: 0.001, fromValues: [1000, 2000, 3000, 4000, 5000] },
+      { fromUnit: "t", toUnit: "kg", factor: 1000, fromValues: [1, 2, 3, 4, 5] },
+      
+      // 体积单位换算
+      { fromUnit: "L", toUnit: "mL", factor: 1000, fromValues: [0.5, 1, 1.5, 2, 2.5] },
+      { fromUnit: "mL", toUnit: "L", factor: 0.001, fromValues: [500, 750, 1000, 1250, 1500] },
+    ];
+
+    let currentQuestions = [];
+    let correctAnswers = {};
+
+    // 生成随机题目
+    function generateQuestions() {
+      const questionsContainer = document.getElementById('questions');
+      const answersContainer = document.getElementById('answers');
+      questionsContainer.innerHTML = '';
+      answersContainer.innerHTML = '';
+      document.getElementById('result').style.display = 'none';
+      
+      currentQuestions = [];
+      correctAnswers = {};
+      
+      // 随机选择5个不重复的题目
+      const selectedTemplates = [];
+      const usedIndices = new Set();
+      
+      while(selectedTemplates.length < 5) {
+        const randomIndex = Math.floor(Math.random() * questionTemplates.length);
+        if (!usedIndices.has(randomIndex)) {
+          usedIndices.add(randomIndex);
+          selectedTemplates.push(questionTemplates[randomIndex]);
+        }
+      }
+      
+      // 生成题目
+      selectedTemplates.forEach((template, index) => {
+        const fromValue = template.fromValues[Math.floor(Math.random() * template.fromValues.length)];
+        const answer = fromValue * template.factor;
+        
+        // 保留3位小数
+        const formattedAnswer = Math.round(answer * 1000) / 1000;
+        
+        currentQuestions.push({
+          id: `q${index+1}`,
+          text: `${fromValue} ${template.fromUnit} = `,
+          unit: template.toUnit,
+          answer: formattedAnswer
+        });
+        
+        correctAnswers[`q${index+1}`] = formattedAnswer;
+        
+        // 创建题目HTML
+        const questionDiv = document.createElement('div');
+        questionDiv.className = 'question';
+        questionDiv.innerHTML = `
+          <div class="question-text">
+            <span class="question-number">${index+1}</span>
+            ${fromValue} ${template.fromUnit} = 
+          </div>
+          <div class="answer-input">
+            <input type="number" id="q${index+1}" placeholder="输入答案" step="any">
+            <span class="unit">${template.toUnit}</span>
+          </div>
+        `;
+        
+        questionsContainer.appendChild(questionDiv);
+        
+        // 创建答案HTML
+        const answerDiv = document.createElement('div');
+        answerDiv.className = 'answer-item';
+        answerDiv.innerHTML = `
+          ${fromValue} ${template.fromUnit} = <span id="ans${index+1}" class="correct">${formattedAnswer}</span> ${template.toUnit}
+        `;
+        
+        answersContainer.appendChild(answerDiv);
+      });
+    }
+
+    // 检查答案
+    function checkAnswers() {
+      let score = 0;
+      
+      currentQuestions.forEach(question => {
+        const userAnswer = parseFloat(document.getElementById(question.id).value) || 0;
+        const correctAnswer = correctAnswers[question.id];
+        
+        // 允许0.1的误差范围
+        if (Math.abs(userAnswer - correctAnswer) < 0.1) {
+          score++;
+        }
+      });
+      
+      // 显示得分
+      document.getElementById('scoreDisplay').textContent = 
+        `得分: ${score} / 5 (${(score/5*100).toFixed(0)}%)`;
+      
+      // 显示结果区域
+      document.getElementById('result').style.display = 'block';
+      
+      // 滚动到结果区域
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    }
+    
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+      generateQuestions();
+      
+      document.getElementById('submitBtn').addEventListener('click', checkAnswers);
+      document.getElementById('resetBtn').addEventListener('click', generateQuestions);
+    });
+  </script>
+</body>
+</html>
